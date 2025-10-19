@@ -47,11 +47,10 @@ public class CompanyService {
         return rs;
     }
 
-    public ResultPaginationDTO fetchCompanyByCreatedBy(String username, Pageable pageable) {
-        Specification<Company> spec = (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("createdBy"),
-                username);
-
-        return this.handleGetCompany(spec, pageable);
+    public ResultPaginationDTO fetchCompanyById(long companyId, Pageable pageable) {
+        Specification<Company> spec = (root, query, cb) -> cb.equal(root.get("id"), companyId);
+        var pageCompany = companyRepository.findAll(spec, pageable);
+        return PaginationUtils.toResultPagination(pageCompany);
     }
 
     public Company handleUpdateCompany(Company c) {
@@ -71,11 +70,18 @@ public class CompanyService {
         Optional<Company> comOptional = this.companyRepository.findById(id);
         if (comOptional.isPresent()) {
             Company com = comOptional.get();
-            // fetch all user belong to this company
+            // fetch all users belong to this company
             List<User> users = this.userRepository.findByCompany(com);
-            this.userRepository.deleteAll(users);
+            // set company=null cho tất cả user
+            for (User u : users) {
+                u.setCompany(null);
+                u.setRole(null);
+            }
+            // lưu lại các user đã cập nhật
+            this.userRepository.saveAll(users);
         }
 
+        // xóa công ty
         this.companyRepository.deleteById(id);
     }
 

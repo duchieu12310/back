@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
 import com.turkraft.springfilter.boot.Filter;
 import jakarta.validation.Valid;
 import vn.nhom11.jobhunter.domain.Permission;
@@ -33,7 +34,8 @@ public class PermissionController {
     private final UserService userService;
     private final RoleService roleService;
 
-    public PermissionController(PermissionService permissionService,
+    public PermissionController(
+            PermissionService permissionService,
             UserService userService,
             RoleService roleService) {
         this.permissionService = permissionService;
@@ -41,83 +43,69 @@ public class PermissionController {
         this.roleService = roleService;
     }
 
+    // ---------------- CREATE ----------------
     @PostMapping("/permissions")
     @ApiMessage("Create a permission")
     public ResponseEntity<Permission> create(@Valid @RequestBody Permission p) throws IdInvalidException {
-        // check exist
         if (this.permissionService.isPermissionExist(p)) {
             throw new IdInvalidException("Permission đã tồn tại.");
         }
-
-        // create new permission
         return ResponseEntity.status(HttpStatus.CREATED).body(this.permissionService.create(p));
     }
 
+    // ---------------- UPDATE ----------------
     @PutMapping("/permissions")
     @ApiMessage("Update a permission")
     public ResponseEntity<Permission> update(@Valid @RequestBody Permission p) throws IdInvalidException {
-        // check exist by id
         if (this.permissionService.fetchById(p.getId()) == null) {
             throw new IdInvalidException("Permission với id = " + p.getId() + " không tồn tại.");
         }
 
-        // check exist by module, apiPath and method
-        if (this.permissionService.isPermissionExist(p)) {
-            // check name
-            if (this.permissionService.isSameName(p)) {
-                throw new IdInvalidException("Permission đã tồn tại.");
-            }
+        if (this.permissionService.isPermissionExist(p) && this.permissionService.isSameName(p)) {
+            throw new IdInvalidException("Permission đã tồn tại.");
         }
 
-        // update permission
         return ResponseEntity.ok().body(this.permissionService.update(p));
     }
 
+    // ---------------- DELETE ----------------
     @DeleteMapping("/permissions/{id}")
-    @ApiMessage("delete a permission")
+    @ApiMessage("Delete a permission")
     public ResponseEntity<Void> delete(@PathVariable("id") long id) throws IdInvalidException {
-        // check exist by id
         if (this.permissionService.fetchById(id) == null) {
             throw new IdInvalidException("Permission với id = " + id + " không tồn tại.");
         }
         this.permissionService.delete(id);
-        return ResponseEntity.ok().body(null);
+        return ResponseEntity.ok().build();
     }
 
+    // ---------------- GET LIST ----------------
     @GetMapping("/permissions")
-    @ApiMessage("Fetch permissions with pagination")
+    @ApiMessage("Fetch permissions")
     public ResponseEntity<ResultPaginationDTO> getPermissions(
-            @Filter Specification<Permission> spec,
-            Pageable pageable) {
+            @Filter Specification<Permission> spec, Pageable pageable) {
 
-        // Lấy thông tin user hiện tại từ token
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
         User user = userService.handleGetUserByUsername(username);
         long idRole = user.getRole().getId();
 
-        System.out.println("ID của role: " + idRole);
-        System.out.println("ID user: " + user.getId());
+        System.out.println("ID role: " + idRole);
         System.out.println("Username: " + username);
 
-        ResultPaginationDTO result;
-
-        // Đếm số quyền của role
         long countPermissionsByRoleId = roleService.countPermissionsByRoleId(idRole);
-        System.out.println("Số quyền của role: " + countPermissionsByRoleId);
+        System.out.println("Số lượng permission trong role: " + countPermissionsByRoleId);
 
         boolean permissionVsRole = roleService.permissionVsRole(idRole);
-        System.out.println("Role có toàn quyền hay không: " + permissionVsRole);
+        System.out.println("Kiểm tra quyền của role: " + permissionVsRole);
 
+        // Nếu là admin thì xem toàn bộ
         if (permissionVsRole) {
-            // Admin xem tất cả quyền
-            result = this.permissionService.getPermissions(spec, pageable);
+            return ResponseEntity.ok(this.permissionService.getPermissions(spec, pageable));
         } else {
-            // User thường chỉ xem quyền do họ tạo
-            result = this.permissionService.fetchPermissionsByCreatedBy(username, pageable);
+            // Người dùng thường chỉ xem permission thuộc role của mình
+            ResultPaginationDTO result = this.permissionService.getPermissionsByRoleId(idRole, pageable);
+            return ResponseEntity.ok(result);
         }
-
-        return ResponseEntity.ok(result);
     }
-
 }

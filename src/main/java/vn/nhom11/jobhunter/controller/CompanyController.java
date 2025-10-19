@@ -65,13 +65,15 @@ public class CompanyController {
         long countPermissionsByRoleId = roleService.countPermissionsByRoleId(idRole);
         System.out.println(countPermissionsByRoleId);
         boolean permissionVsrole = roleService.permissionVsRole(idRole);
+        System.out.println("312312312312312312313");
         System.out.println(permissionVsrole);
+
         if (permissionVsrole) {
             // Admin xem tất cả
             result = this.companyService.handleGetCompany(spec, pageable);
         } else {
             // User thường chỉ xem company do mình tạo
-            result = this.companyService.fetchCompanyByCreatedBy(username, pageable);
+            result = this.companyService.fetchCompanyById(user.getCompany().getId(), pageable);
         }
 
         return ResponseEntity.ok(result);

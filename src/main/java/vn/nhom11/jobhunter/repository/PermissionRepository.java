@@ -11,6 +11,8 @@ public interface PermissionRepository extends JpaRepository<Permission, Long>,
                 JpaSpecificationExecutor<Permission> {
         boolean existsByModuleAndApiPathAndMethod(String module, String apiPath, String method);
 
+        List<Permission> findByRoles_Id(Long roleId);
+
         List<Permission> findByIdIn(List<Long> id);
 
         long count();

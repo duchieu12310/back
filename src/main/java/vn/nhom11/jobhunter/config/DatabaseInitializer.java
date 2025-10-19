@@ -97,6 +97,10 @@ public class DatabaseInitializer implements CommandLineRunner {
                     "/api/v1/company-registrations/{id}/status", "PUT", "COMPANY_REGISTRATIONS"));
             arr.add(new Permission("Get company registration by id", "/api/v1/company-registrations/{id}", "GET",
                     "COMPANY_REGISTRATIONS"));
+            arr.add(new Permission("Reject company registration",
+                    "/api/v1/company-registrations/{id}/reject", "PUT", "COMPANY_REGISTRATIONS"));
+            arr.add(new Permission("Delete company registration",
+                    "/api/v1/company-registrations/{id}", "DELETE", "COMPANY_REGISTRATIONS"));
 
             this.permissionRepository.saveAll(arr);
         }

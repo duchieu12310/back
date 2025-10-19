@@ -116,4 +116,9 @@ public class RoleService {
         return a == b; // true nếu role này có đủ tất cả quyền, false nếu chưa đủ
     }
 
+    public Role findById(Long id) {
+        Optional<Role> roleOptional = this.roleRepository.findById(id);
+        return roleOptional.orElse(null);
+    }
+
 }

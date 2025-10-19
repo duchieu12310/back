@@ -13,10 +13,13 @@ import org.springframework.web.bind.annotation.*;
 import com.turkraft.springfilter.boot.Filter;
 
 import jakarta.validation.Valid;
+import vn.nhom11.jobhunter.domain.Company;
 import vn.nhom11.jobhunter.domain.CompanyRegistration;
+import vn.nhom11.jobhunter.domain.Role;
 import vn.nhom11.jobhunter.domain.User;
 import vn.nhom11.jobhunter.domain.response.ResultPaginationDTO;
 import vn.nhom11.jobhunter.service.CompanyRegistrationService;
+import vn.nhom11.jobhunter.service.CompanyService;
 import vn.nhom11.jobhunter.service.RoleService;
 import vn.nhom11.jobhunter.service.UserService;
 import vn.nhom11.jobhunter.util.annotation.ApiMessage;
@@ -29,14 +32,14 @@ public class CompanyRegistrationController {
     private final CompanyRegistrationService registrationService;
     private final UserService userService;
     private final RoleService roleService;
+    private final CompanyService companyService;
 
-    public CompanyRegistrationController(
-            CompanyRegistrationService registrationService,
-            UserService userService,
-            RoleService roleService) {
+    public CompanyRegistrationController(CompanyRegistrationService registrationService, UserService userService,
+            RoleService roleService, CompanyService companyService) {
         this.registrationService = registrationService;
         this.userService = userService;
         this.roleService = roleService;
+        this.companyService = companyService;
     }
 
     /**
@@ -87,30 +90,68 @@ public class CompanyRegistrationController {
     /**
      * ✅ Admin phê duyệt yêu cầu
      */
-    @PutMapping("/{id}/status")
-    @ApiMessage("Approve company registration request")
-    public ResponseEntity<?> approveRegistration(@PathVariable("id") Long id) {
-        CompanyRegistration updated = registrationService.handleUpdateStatus(id, RegistrationStatus.APPROVED, null);
-        if (updated == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Registration not found");
-        }
-        return ResponseEntity.ok(updated);
-    }
-
     /**
-     * ❌ Admin từ chối yêu cầu (có lý do)
+     * ⚙️ Admin cập nhật trạng thái yêu cầu đăng ký công ty (phê duyệt hoặc từ chối)
      */
-    @PutMapping("/{id}/reject")
-    @ApiMessage("Reject company registration request")
-    public ResponseEntity<?> rejectRegistration(
+    @PutMapping("/{id}/status")
+    @ApiMessage("Update company registration status (approve or reject)")
+    public ResponseEntity<?> updateRegistrationStatus(
             @PathVariable("id") Long id,
-            @RequestBody String rejectionReason) {
-        CompanyRegistration updated = registrationService.handleUpdateStatus(id, RegistrationStatus.REJECTED,
-                rejectionReason);
-        if (updated == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Registration not found");
+            @RequestParam("status") String status,
+            @RequestBody(required = false) String rejectionReason) {
+
+        // Chuyển status từ string sang enum
+        RegistrationStatus registrationStatus;
+        try {
+            registrationStatus = RegistrationStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Invalid status. Must be APPROVED or REJECTED.");
         }
+
+        // Chỉ cập nhật lý do khi bị từ chối
+        String finalReason = null;
+        if (registrationStatus == RegistrationStatus.REJECTED) {
+            finalReason = (rejectionReason != null && !rejectionReason.trim().isEmpty())
+                    ? rejectionReason.trim()
+                    : "Không có lý do cụ thể.";
+        }
+
+        // Cập nhật trạng thái đăng ký
+        CompanyRegistration updated = registrationService.handleUpdateStatus(id, registrationStatus, finalReason);
+        if (updated == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Company registration not found");
+        }
+
+        // Nếu phê duyệt, tạo công ty dựa trên thông tin đăng ký
+        if (registrationStatus == RegistrationStatus.APPROVED) {
+            Company company = new Company();
+            company.setName(updated.getCompanyName());
+            company.setDescription(updated.getDescription());
+            company.setAddress(updated.getAddress());
+            company.setLogo(updated.getLogo());
+
+            User user = userService.fetchUserById(updated.getUser().getId());
+            // Gán user tạo công ty với role id = 3
+
+            Optional<Company> companyOptional = this.companyService.findById(user.getCompany().getId());
+            user.setCompany(companyOptional.isPresent() ? companyOptional.get() : null);
+            Role r = roleService.fetchById(2);
+            user.setRole(r);
+            // Lưu lại user
+            userService.handleUpdateUser(user);
+        }
+        if (registrationStatus == RegistrationStatus.REJECTED) {
+            User user = userService.fetchUserById(updated.getUser().getId());
+
+            // Kiểm tra role và company
+
+            companyService.handleDeleteCompany(user.getCompany().getId());
+        }
+
         return ResponseEntity.ok(updated);
+
     }
 
     /**
