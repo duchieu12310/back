@@ -15,6 +15,7 @@ import com.turkraft.springfilter.converter.FilterSpecificationConverter;
 import com.turkraft.springfilter.parser.FilterParser;
 import com.turkraft.springfilter.parser.node.FilterNode;
 
+import vn.nhom11.jobhunter.domain.Company;
 import vn.nhom11.jobhunter.domain.Job;
 import vn.nhom11.jobhunter.domain.Resume;
 import vn.nhom11.jobhunter.domain.User;
@@ -26,6 +27,7 @@ import vn.nhom11.jobhunter.repository.JobRepository;
 import vn.nhom11.jobhunter.repository.ResumeRepository;
 import vn.nhom11.jobhunter.repository.UserRepository;
 import vn.nhom11.jobhunter.util.SecurityUtil;
+import vn.nhom11.jobhunter.util.constant.ResumeStateEnum;
 
 @Service
 public class ResumeService {
@@ -56,14 +58,12 @@ public class ResumeService {
     }
 
     public boolean checkResumeExistByUserAndJob(Resume resume) {
-        // check user by id
         if (resume.getUser() == null)
             return false;
         Optional<User> userOptional = this.userRepository.findById(resume.getUser().getId());
         if (userOptional.isEmpty())
             return false;
 
-        // check job by id
         if (resume.getJob() == null)
             return false;
         Optional<Job> jobOptional = this.jobRepository.findById(resume.getJob().getId());
@@ -80,7 +80,6 @@ public class ResumeService {
         res.setId(resume.getId());
         res.setCreatedBy(resume.getCreatedBy());
         res.setCreatedAt(resume.getCreatedAt());
-
         return res;
     }
 
@@ -96,6 +95,9 @@ public class ResumeService {
         this.resumeRepository.deleteById(id);
     }
 
+    /**
+     * ✅ Hàm ánh xạ đầy đủ Resume → ResFetchResumeDTO
+     */
     public ResFetchResumeDTO getResume(Resume resume) {
         ResFetchResumeDTO res = new ResFetchResumeDTO();
         res.setId(resume.getId());
@@ -107,66 +109,113 @@ public class ResumeService {
         res.setUpdatedAt(resume.getUpdatedAt());
         res.setUpdatedBy(resume.getUpdatedBy());
 
-        if (resume.getJob() != null) {
-            res.setCompanyName(resume.getJob().getCompany().getName());
+        // User
+        if (resume.getUser() != null) {
+            res.setUser(new ResFetchResumeDTO.UserResume(
+                    resume.getUser().getId(),
+                    resume.getUser().getName()));
         }
 
-        res.setUser(new ResFetchResumeDTO.UserResume(resume.getUser().getId(), resume.getUser().getName()));
-        res.setJob(new ResFetchResumeDTO.JobResume(resume.getJob().getId(), resume.getJob().getName()));
+        // Job + Company
+        if (resume.getJob() != null) {
+            Job job = resume.getJob();
+            Company company = job.getCompany();
+
+            ResFetchResumeDTO.CompanyResume companyDTO = null;
+            if (company != null) {
+                companyDTO = new ResFetchResumeDTO.CompanyResume(
+                        company.getId(),
+                        company.getName(),
+                        company.getAddress(),
+                        company.getLogo(),
+                        company.getDescription());
+            }
+
+            ResFetchResumeDTO.JobResume jobDTO = new ResFetchResumeDTO.JobResume(
+                    job.getId(),
+                    job.getName(),
+                    job.getLocation(),
+                    job.getSalary(),
+                    job.getLevel() != null ? job.getLevel().name() : null,
+                    companyDTO);
+
+            res.setJob(jobDTO);
+        }
 
         return res;
     }
 
+    public ResultPaginationDTO fetchResumesByCompanyId(long companyId, Pageable pageable) {
+        Specification<Resume> spec = (root, query, cb) -> cb.equal(root.get("job").get("company").get("id"), companyId);
+        return this.fetchAllResume(spec, pageable);
+    }
+
     public ResultPaginationDTO fetchAllResume(Specification<Resume> spec, Pageable pageable) {
-        Page<Resume> pageUser = this.resumeRepository.findAll(spec, pageable);
-        ResultPaginationDTO rs = new ResultPaginationDTO();
-        ResultPaginationDTO.Meta mt = new ResultPaginationDTO.Meta();
+        Page<Resume> page = this.resumeRepository.findAll(spec, pageable);
 
-        mt.setPage(pageable.getPageNumber() + 1);
-        mt.setPageSize(pageable.getPageSize());
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(page.getTotalPages());
+        meta.setTotal(page.getTotalElements());
 
-        mt.setPages(pageUser.getTotalPages());
-        mt.setTotal(pageUser.getTotalElements());
-
-        rs.setMeta(mt);
-
-        // remove sensitive data
-        List<ResFetchResumeDTO> listResume = pageUser.getContent()
-                .stream().map(item -> this.getResume(item))
+        List<ResFetchResumeDTO> results = page.getContent()
+                .stream().map(this::getResume)
                 .collect(Collectors.toList());
 
-        rs.setResult(listResume);
-
+        ResultPaginationDTO rs = new ResultPaginationDTO();
+        rs.setMeta(meta);
+        rs.setResult(results);
         return rs;
     }
 
+    public ResUpdateResumeDTO updateStatus(long resumeId, ResumeStateEnum newStatus, String note) {
+        Optional<Resume> optionalResume = this.resumeRepository.findById(resumeId);
+        if (optionalResume.isEmpty()) {
+            throw new RuntimeException("Không tìm thấy hồ sơ có id = " + resumeId);
+        }
+
+        Resume resume = optionalResume.get();
+
+        if (newStatus == ResumeStateEnum.APPROVED) {
+            resume.setStatus(newStatus);
+            resume.setNote(note != null && !note.isBlank() ? note : "Đã được chấp nhận. Liên hệ ứng viên qua email.");
+        } else if (newStatus == ResumeStateEnum.REJECTED) {
+            resume.setStatus(newStatus);
+            resume.setNote(note != null && !note.isBlank() ? note : "Không đạt yêu cầu.");
+        } else {
+            resume.setStatus(newStatus);
+            resume.setNote(note);
+        }
+
+        resume = this.resumeRepository.save(resume);
+
+        ResUpdateResumeDTO res = new ResUpdateResumeDTO();
+        res.setUpdatedAt(resume.getUpdatedAt());
+        res.setUpdatedBy(resume.getUpdatedBy());
+        return res;
+    }
+
     public ResultPaginationDTO fetchResumeByUser(Pageable pageable) {
-        // query builder
-        String email = SecurityUtil.getCurrentUserLogin().isPresent() == true
-                ? SecurityUtil.getCurrentUserLogin().get()
-                : "";
+        String email = SecurityUtil.getCurrentUserLogin().orElse("");
         FilterNode node = filterParser.parse("email='" + email + "'");
         FilterSpecification<Resume> spec = filterSpecificationConverter.convert(node);
-        Page<Resume> pageResume = this.resumeRepository.findAll(spec, pageable);
 
-        ResultPaginationDTO rs = new ResultPaginationDTO();
-        ResultPaginationDTO.Meta mt = new ResultPaginationDTO.Meta();
+        Page<Resume> page = this.resumeRepository.findAll(spec, pageable);
 
-        mt.setPage(pageable.getPageNumber() + 1);
-        mt.setPageSize(pageable.getPageSize());
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(page.getTotalPages());
+        meta.setTotal(page.getTotalElements());
 
-        mt.setPages(pageResume.getTotalPages());
-        mt.setTotal(pageResume.getTotalElements());
-
-        rs.setMeta(mt);
-
-        // remove sensitive data
-        List<ResFetchResumeDTO> listResume = pageResume.getContent()
-                .stream().map(item -> this.getResume(item))
+        List<ResFetchResumeDTO> results = page.getContent()
+                .stream().map(this::getResume)
                 .collect(Collectors.toList());
 
-        rs.setResult(listResume);
-
+        ResultPaginationDTO rs = new ResultPaginationDTO();
+        rs.setMeta(meta);
+        rs.setResult(results);
         return rs;
     }
 }

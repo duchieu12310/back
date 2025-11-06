@@ -24,10 +24,10 @@ public class ResFetchResumeDTO {
     private String createdBy;
     private String updatedBy;
 
-    private String companyName;
     private UserResume user;
     private JobResume job;
 
+    // --- Inner DTO classes ---
     @Getter
     @Setter
     @AllArgsConstructor
@@ -42,5 +42,20 @@ public class ResFetchResumeDTO {
     public static class JobResume {
         private long id;
         private String name;
+        private String location;
+        private double salary;
+        private String level;
+        private CompanyResume company; // ← thêm company vào job
+    }
+
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    public static class CompanyResume {
+        private long id;
+        private String name;
+        private String address;
+        private String logo;
+        private String description;
     }
 }

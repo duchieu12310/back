@@ -37,6 +37,9 @@ public class Resume {
     @Enumerated(EnumType.STRING)
     private ResumeStateEnum status;
 
+    // ✅ Thêm trường ghi chú khi từ chối hồ sơ
+    private String note;
+
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -53,20 +56,17 @@ public class Resume {
 
     @PrePersist
     public void handleBeforeCreate() {
-        this.createdBy = SecurityUtil.getCurrentUserLogin().isPresent() == true
+        this.createdBy = SecurityUtil.getCurrentUserLogin().isPresent()
                 ? SecurityUtil.getCurrentUserLogin().get()
                 : "";
-
         this.createdAt = Instant.now();
     }
 
     @PreUpdate
     public void handleBeforeUpdate() {
-        this.updatedBy = SecurityUtil.getCurrentUserLogin().isPresent() == true
+        this.updatedBy = SecurityUtil.getCurrentUserLogin().isPresent()
                 ? SecurityUtil.getCurrentUserLogin().get()
                 : "";
-
         this.updatedAt = Instant.now();
     }
-
 }

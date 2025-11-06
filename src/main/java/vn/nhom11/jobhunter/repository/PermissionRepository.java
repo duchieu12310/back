@@ -9,6 +9,7 @@ import vn.nhom11.jobhunter.domain.Permission;
 @Repository
 public interface PermissionRepository extends JpaRepository<Permission, Long>,
                 JpaSpecificationExecutor<Permission> {
+
         boolean existsByModuleAndApiPathAndMethod(String module, String apiPath, String method);
 
         List<Permission> findByRoles_Id(Long roleId);
@@ -16,4 +17,11 @@ public interface PermissionRepository extends JpaRepository<Permission, Long>,
         List<Permission> findByIdIn(List<Long> id);
 
         long count();
+
+        // 🔹 Lấy tất cả quyền theo module (vd: "JOBS", "USERS", "RESUMES")
+        List<Permission> findByModule(String module);
+
+        // 🔹 Lấy một quyền cụ thể theo apiPath và method (vd: "/api/v1/companies",
+        // "PUT")
+        Permission findByApiPathAndMethod(String apiPath, String method);
 }

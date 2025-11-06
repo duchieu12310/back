@@ -48,9 +48,12 @@ public class CompanyService {
     }
 
     public ResultPaginationDTO fetchCompanyById(long companyId, Pageable pageable) {
-        Specification<Company> spec = (root, query, cb) -> cb.equal(root.get("id"), companyId);
-        var pageCompany = companyRepository.findAll(spec, pageable);
-        return PaginationUtils.toResultPagination(pageCompany);
+        // Tạo điều kiện lọc (Specification)
+        Specification<Company> spec = (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("id"),
+                companyId);
+
+        // Gọi hàm handleGetCompany() để tái sử dụng logic phân trang
+        return this.handleGetCompany(spec, pageable);
     }
 
     public Company handleUpdateCompany(Company c) {

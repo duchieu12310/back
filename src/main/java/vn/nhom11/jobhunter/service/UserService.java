@@ -142,6 +142,30 @@ public class UserService {
         return res;
     }
 
+    public ResultPaginationDTO fetchAllUserByCreatorOrSelf(String creator, long userId, Pageable pageable) {
+        Page<User> pageUser = this.userRepository.findAllByCreatorOrSelf(creator, userId, pageable);
+
+        // Dùng lại logic phân trang từ fetchAllUser
+        ResultPaginationDTO rs = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta mt = new ResultPaginationDTO.Meta();
+
+        mt.setPage(pageable.getPageNumber() + 1);
+        mt.setPageSize(pageable.getPageSize());
+        mt.setPages(pageUser.getTotalPages());
+        mt.setTotal(pageUser.getTotalElements());
+
+        rs.setMeta(mt);
+
+        // Chuyển sang ResUserDTO (dùng hàm có sẵn)
+        List<ResUserDTO> listUser = pageUser.getContent()
+                .stream()
+                .map(this::convertToResUserDTO)
+                .collect(Collectors.toList());
+
+        rs.setResult(listUser);
+        return rs;
+    }
+
     public ResUpdateUserDTO convertToResUpdateUserDTO(User user) {
         ResUpdateUserDTO res = new ResUpdateUserDTO();
         ResUpdateUserDTO.CompanyUser com = new ResUpdateUserDTO.CompanyUser();
