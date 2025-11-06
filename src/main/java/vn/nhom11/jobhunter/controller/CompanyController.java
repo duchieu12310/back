@@ -79,11 +79,15 @@ public class CompanyController {
         return ResponseEntity.ok(result);
     }
 
-    @GetMapping("/companies/all")
-    @ApiMessage("Fetch all companies (admin only)")
-    public ResponseEntity<ResultPaginationDTO> getAllCompanies(
-            @Filter Specification<Company> spec, Pageable pageable) {
+    @GetMapping("/companies/public")
+    @ApiMessage("Fetch all companies (no role check)")
+    public ResponseEntity<ResultPaginationDTO> getAllCompaniesPublic(
+            @Filter Specification<Company> spec,
+            Pageable pageable) {
+
+        // Gọi trực tiếp hàm trong service, không kiểm tra role
         ResultPaginationDTO result = this.companyService.handleGetCompany(spec, pageable);
+
         return ResponseEntity.ok(result);
     }
 

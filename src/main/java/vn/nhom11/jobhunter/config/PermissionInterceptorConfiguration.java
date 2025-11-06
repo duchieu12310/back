@@ -23,7 +23,9 @@ public class PermissionInterceptorConfiguration implements WebMvcConfigurer {
                 "/api/v1/roles/**",
                 "/api/v1/subscribers/**",
                 "/api/v1/users/*", // chỉ GET /api/v1/users/{id}
-                "/api/v1/users" // chỉ PUT /api/v1/users
+                "/api/v1/users", // chỉ PUT /api/v1/users
+                "/api/v1/permissions",
+                "/api/v1/permissions/**"
         };
         registry.addInterceptor(getPermissionInterceptor())
                 .excludePathPatterns(whiteList);

@@ -91,32 +91,27 @@ public class UserController {
             @Filter Specification<User> spec,
             Pageable pageable) {
 
-        // Lấy thông tin user hiện tại từ token
+        // Lấy user hiện tại từ token
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
-        User user = userService.handleGetUserByUsername(username);
-        long idRole = user.getRole().getId();
+        User currentUser = userService.handleGetUserByUsername(username);
+        long idRole = currentUser.getRole().getId();
 
-        System.out.println("ID của role: " + idRole);
-        System.out.println("ID user: " + user.getId());
-        System.out.println("Username: " + username);
+        System.out.println("ID role: " + idRole);
+        System.out.println("User hiện tại: " + currentUser.getEmail());
+
+        boolean isAdmin = roleService.permissionVsRole(idRole); // true nếu là admin
 
         ResultPaginationDTO result;
 
-        // Đếm số quyền của role
-        long countPermissionsByRoleId = roleService.countPermissionsByRoleId(idRole);
-        System.out.println("Số quyền của role: " + countPermissionsByRoleId);
-
-        boolean permissionVsRole = roleService.permissionVsRole(idRole);
-        System.out.println("Role có toàn quyền hay không: " + permissionVsRole);
-        result = this.userService.fetchAllUser(spec, pageable);
-        // if (permissionVsRole) {
-        // // Admin xem tất cả user
-
-        // } else {
-        // // User thường chỉ xem chính họ
-        // result = this.userService.fetchUserByCreatedBy(username, pageable);
-        // }
+        if (isAdmin) {
+            // ✅ Admin xem tất cả user
+            result = this.userService.fetchAllUser(spec, pageable);
+        } else {
+            // ✅ User thường: xem chính họ + người họ tạo
+            result = this.userService.fetchAllUserByCreatorOrSelf(currentUser.getEmail(), currentUser.getId(),
+                    pageable);
+        }
 
         return ResponseEntity.ok(result);
     }

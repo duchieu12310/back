@@ -51,6 +51,25 @@ public class RoleService {
         return null;
     }
 
+    public ResultPaginationDTO getRolesCreatedBy(String createdBy, Pageable pageable) {
+        Specification<Role> spec = (root, query, cb) -> cb.equal(root.get("createdBy"), createdBy);
+
+        Page<Role> pageRole = this.roleRepository.findAll(spec, pageable);
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+
+        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(pageRole.getTotalPages());
+        meta.setTotal(pageRole.getTotalElements());
+
+        result.setMeta(meta);
+        result.setResult(pageRole.getContent());
+
+        return result;
+    }
+
     public Role update(Role r) {
         Role roleDB = this.fetchById(r.getId());
         // check permissions
@@ -89,6 +108,31 @@ public class RoleService {
         rs.setMeta(mt);
         rs.setResult(pRole.getContent());
         return rs;
+    }
+
+    public ResultPaginationDTO fetchRoleById(long id, Pageable pageable) {
+        Role role = this.fetchById(id);
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+
+        if (role == null) {
+            meta.setPage(1);
+            meta.setPageSize(pageable.getPageSize());
+            meta.setTotal(0);
+            meta.setPages(0);
+            result.setMeta(meta);
+            result.setResult(List.of());
+            return result;
+        }
+
+        meta.setPage(1);
+        meta.setPageSize(pageable.getPageSize());
+        meta.setTotal(1);
+        meta.setPages(1);
+
+        result.setMeta(meta);
+        result.setResult(List.of(role));
+        return result;
     }
 
     public ResultPaginationDTO fetchRolesByCreatedBy(String username, Pageable pageable) {
