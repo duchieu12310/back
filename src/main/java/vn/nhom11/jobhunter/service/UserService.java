@@ -61,55 +61,6 @@ public class UserService {
         return null;
     }
 
-    public ResultPaginationDTO fetchAllUser(Specification<User> spec, Pageable pageable) {
-        Page<User> pageUser = this.userRepository.findAll(spec, pageable);
-        ResultPaginationDTO rs = new ResultPaginationDTO();
-        ResultPaginationDTO.Meta mt = new ResultPaginationDTO.Meta();
-
-        mt.setPage(pageable.getPageNumber() + 1);
-        mt.setPageSize(pageable.getPageSize());
-
-        mt.setPages(pageUser.getTotalPages());
-        mt.setTotal(pageUser.getTotalElements());
-
-        rs.setMeta(mt);
-
-        // remove sensitive data
-        List<ResUserDTO> listUser = pageUser.getContent()
-                .stream().map(item -> this.convertToResUserDTO(item))
-                .collect(Collectors.toList());
-
-        rs.setResult(listUser);
-
-        return rs;
-    }
-
-    public User handleUpdateUser(User reqUser) {
-        User currentUser = this.fetchUserById(reqUser.getId());
-        if (currentUser != null) {
-            currentUser.setAddress(reqUser.getAddress());
-            currentUser.setGender(reqUser.getGender());
-            currentUser.setAge(reqUser.getAge());
-            currentUser.setName(reqUser.getName());
-
-            // check company
-            if (reqUser.getCompany() != null) {
-                Optional<Company> companyOptional = this.companyService.findById(reqUser.getCompany().getId());
-                currentUser.setCompany(companyOptional.isPresent() ? companyOptional.get() : null);
-            }
-
-            // check role
-            if (reqUser.getRole() != null) {
-                Role r = this.roleService.fetchById(reqUser.getRole().getId());
-                currentUser.setRole(r != null ? r : null);
-            }
-
-            // update
-            currentUser = this.userRepository.save(currentUser);
-        }
-        return currentUser;
-    }
-
     public User handleGetUserByUsername(String username) {
         return this.userRepository.findByEmail(username);
     }
