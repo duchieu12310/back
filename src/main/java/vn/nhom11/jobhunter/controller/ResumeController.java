@@ -45,116 +45,65 @@ public class ResumeController {
         this.roleService = roleService;
     }
 
+    private User currentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return userService.handleGetUserByUsername(auth.getName());
+    }
+
     @PostMapping("/resumes")
-    @ApiMessage("Create a resume")
-    public ResponseEntity<ResCreateResumeDTO> create(@Valid @RequestBody Resume resume) throws IdInvalidException {
-        // Kiểm tra userId và jobId có tồn tại không
-        boolean isIdExist = this.resumeService.checkResumeExistByUserAndJob(resume);
-        if (!isIdExist) {
-            throw new IdInvalidException("User id/Job id không tồn tại");
+    public ResponseEntity<?> create(@RequestBody Resume resume) throws IdInvalidException {
+
+        if (!resumeService.checkResumeExistByUserAndJob(resume)) {
+            throw new IdInvalidException("User/Job không tồn tại");
         }
 
-        // Tạo resume mới
-        return ResponseEntity.status(HttpStatus.CREATED).body(this.resumeService.create(resume));
+        return ResponseEntity.ok(resumeService.create(resume));
     }
 
     @PutMapping("/resumes/{id}")
-    @ApiMessage("Cập nhật trạng thái hoặc ghi chú hồ sơ")
-    public ResponseEntity<?> updateResume(
-            @PathVariable("id") long id,
-            @RequestBody Resume resumeUpdate)
-            throws IdInvalidException {
+    public ResponseEntity<?> updateResume(@PathVariable long id, @RequestBody Resume data) throws IdInvalidException {
 
-        // ✅ Lấy user hiện tại từ token đăng nhập
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
-        User user = userService.handleGetUserByUsername(username);
-
-        long idRole = user.getRole().getId();
-        boolean isAdmin = roleService.permissionVsRole(idRole);
-
-        // ✅ Nếu là admin → báo lỗi, không cho cập nhật
-        if (isAdmin) {
-            return ResponseEntity
-                    .status(HttpStatus.FORBIDDEN)
-                    .body("Admin không được phép cập nhật trạng thái hoặc ghi chú hồ sơ");
+        User user = currentUser();
+        if (roleService.permissionVsRole(user.getRole().getId())) {
+            return ResponseEntity.status(403).body("Admin không được cập nhật resume");
         }
 
-        // ✅ Kiểm tra resume có tồn tại không
-        Optional<Resume> resumeOptional = this.resumeService.fetchById(id);
-        if (resumeOptional.isEmpty()) {
-            throw new IdInvalidException("Resume với id = " + id + " không tồn tại");
-        }
+        Resume resume = resumeService.fetchById(id)
+                .orElseThrow(() -> new IdInvalidException("Không tìm thấy resume"));
 
-        Resume existingResume = resumeOptional.get();
+        if (data.getStatus() != null) resume.setStatus(data.getStatus());
+        if (data.getNote() != null) resume.setNote(data.getNote());
 
-        // ✅ Chỉ cập nhật những trường được gửi lên
-        if (resumeUpdate.getStatus() != null)
-            existingResume.setStatus(resumeUpdate.getStatus());
-
-        if (resumeUpdate.getNote() != null)
-            existingResume.setNote(resumeUpdate.getNote());
-
-        ResUpdateResumeDTO res = this.resumeService.update(existingResume);
-        return ResponseEntity.ok(res);
-    }
-
-    @PutMapping("/resumes")
-    @ApiMessage("Update a resume")
-    public ResponseEntity<ResUpdateResumeDTO> update(@RequestBody Resume resume) throws IdInvalidException {
-        // Kiểm tra resume có tồn tại không
-        Optional<Resume> reqResumeOptional = this.resumeService.fetchById(resume.getId());
-        if (reqResumeOptional.isEmpty()) {
-            throw new IdInvalidException("Resume với id = " + resume.getId() + " không tồn tại");
-        }
-
-        Resume reqResume = reqResumeOptional.get();
-        reqResume.setStatus(resume.getStatus());
-        return ResponseEntity.ok().body(this.resumeService.update(reqResume));
+        return ResponseEntity.ok(resumeService.update(resume));
     }
 
     @DeleteMapping("/resumes/{id}")
-    @ApiMessage("Delete a resume by id")
-    public ResponseEntity<Void> delete(@PathVariable("id") long id) throws IdInvalidException {
-        Optional<Resume> reqResumeOptional = this.resumeService.fetchById(id);
-        if (reqResumeOptional.isEmpty()) {
-            throw new IdInvalidException("Resume với id = " + id + " không tồn tại");
-        }
+    public ResponseEntity<?> delete(@PathVariable long id) throws IdInvalidException {
 
-        this.resumeService.delete(id);
+        resumeService.fetchById(id)
+                .orElseThrow(() -> new IdInvalidException("Không tìm thấy resume"));
+
+        resumeService.delete(id);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/resumes")
-    @ApiMessage("Fetch resumes by company with pagination")
-    public ResponseEntity<ResultPaginationDTO> getResumesByCompany(
+    public ResponseEntity<?> getResumesByCompany(
             @Filter Specification<Resume> spec,
             Pageable pageable) {
 
-        // ✅ Lấy user hiện tại từ token
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
-        User user = userService.handleGetUserByUsername(username);
+        User user = currentUser();
 
-        long idRole = user.getRole().getId();
-        boolean isAdmin = roleService.permissionVsRole(idRole);
-
-        ResultPaginationDTO result;
-
-        if (isAdmin) {
-            // ✅ Admin xem tất cả resumes
-            result = this.resumeService.fetchAllResume(spec, pageable);
-        } else {
-            // ✅ User chỉ xem resume thuộc công ty của mình
-            if (user.getCompany() == null) {
-                // Không có công ty → danh sách rỗng
-                result = new ResultPaginationDTO();
-            } else {
-                long companyId = user.getCompany().getId();
-                result = this.resumeService.fetchResumesByCompanyId(companyId, pageable);
-            }
+        if (roleService.permissionVsRole(user.getRole().getId())) {
+            return ResponseEntity.ok(resumeService.fetchAllResume(spec, pageable));
         }
 
-        return ResponseEntity.ok(result);
+        if (user.getCompany() == null) {
+            return ResponseEntity.ok(new ResultPaginationDTO());
+        }
+
+        return ResponseEntity.ok(
+                resumeService.fetchResumesByCompanyId(user.getCompany().getId(), pageable)
+        );
     }
 }
