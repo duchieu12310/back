@@ -54,7 +54,9 @@ public class User {
     private Instant updatedAt;
     private String createdBy;
     private String updatedBy;
+    private boolean enabled = false; // user đã xác nhận email chưa
 
+    private String verificationToken; // token xác nhận email
     @ManyToOne
     @JoinColumn(name = "company_id")
     private Company company;

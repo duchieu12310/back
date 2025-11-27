@@ -48,6 +48,56 @@ public class CompanyController {
                 .body(this.companyService.handleCreateCompany(reqCompany));
     }
 
+    @GetMapping("/companies")
+    @ApiMessage("Fetch companies with pagination")
+    public ResponseEntity<ResultPaginationDTO> getCompany(
+            @Filter Specification<Company> spec, Pageable pageable) {
+
+        // Lấy thông tin user hiện tại từ token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        User user = userService.handleGetUserByUsername(username);
+        long idRole = user.getRole().getId();
+        System.out.println("ID cua role " + idRole);
+        System.out.println(user.getId());
+        System.out.println(username);
+        ResultPaginationDTO result;
+        long countPermissionsByRoleId = roleService.countPermissionsByRoleId(idRole);
+        System.out.println(countPermissionsByRoleId);
+        boolean permissionVsrole = roleService.permissionVsRole(idRole);
+        System.out.println("312312312312312312313");
+        System.out.println(permissionVsrole);
+
+        if (permissionVsrole) {
+            // Admin xem tất cả
+            result = this.companyService.handleGetCompany(spec, pageable);
+        } else {
+            // User thường chỉ xem company do mình tạo
+            result = this.companyService.fetchCompanyById(user.getCompany().getId(), pageable);
+        }
+
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/companies/public")
+    @ApiMessage("Fetch all companies (no role check)")
+    public ResponseEntity<ResultPaginationDTO> getAllCompaniesPublic(
+            @Filter Specification<Company> spec,
+            Pageable pageable) {
+
+        // Gọi trực tiếp hàm trong service, không kiểm tra role
+        ResultPaginationDTO result = this.companyService.handleGetCompany(spec, pageable);
+
+        return ResponseEntity.ok(result);
+    }
+
+    @PutMapping("/companies")
+    @ApiMessage("Update company")
+    public ResponseEntity<Company> updateCompany(@Valid @RequestBody Company reqCompany) {
+        Company updatedCompany = this.companyService.handleUpdateCompany(reqCompany);
+        return ResponseEntity.ok(updatedCompany);
+    }
+
     @DeleteMapping("/companies/{id}")
     @ApiMessage("Delete company")
     public ResponseEntity<Void> deleteCompany(@PathVariable("id") long id) {

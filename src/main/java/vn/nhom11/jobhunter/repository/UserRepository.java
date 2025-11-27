@@ -16,14 +16,19 @@ import vn.nhom11.jobhunter.domain.User;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
 
+    // Tìm user theo email
     User findByEmail(String email);
 
+    // Kiểm tra email đã tồn tại chưa
     boolean existsByEmail(String email);
 
+    // Tìm user theo refresh token và email (login refresh)
     User findByRefreshTokenAndEmail(String token, String email);
 
+    // Tìm tất cả user thuộc 1 công ty
     List<User> findByCompany(Company company);
 
+    // Tìm tất cả user do creator tạo hoặc chính mình
     @Query("""
                 SELECT u FROM User u
                 WHERE u.createdBy = :creator OR u.id = :userId
@@ -31,4 +36,14 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     Page<User> findAllByCreatorOrSelf(@Param("creator") String creator,
             @Param("userId") long userId,
             Pageable pageable);
+
+    // =================== MỚI ===================
+    // Tìm user theo verification token
+    User findByVerificationToken(String token);
+
+    // Tìm user theo email và đã kích hoạt (enabled)
+    User findByEmailAndEnabledTrue(String email);
+
+    // Tìm user theo email và chưa kích hoạt
+    User findByEmailAndEnabledFalse(String email);
 }

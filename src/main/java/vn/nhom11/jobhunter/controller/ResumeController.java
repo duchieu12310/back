@@ -99,4 +99,62 @@ public class ResumeController {
         return ResponseEntity.ok(res);
     }
 
+    @PutMapping("/resumes")
+    @ApiMessage("Update a resume")
+    public ResponseEntity<ResUpdateResumeDTO> update(@RequestBody Resume resume) throws IdInvalidException {
+        // Kiểm tra resume có tồn tại không
+        Optional<Resume> reqResumeOptional = this.resumeService.fetchById(resume.getId());
+        if (reqResumeOptional.isEmpty()) {
+            throw new IdInvalidException("Resume với id = " + resume.getId() + " không tồn tại");
+        }
+
+        Resume reqResume = reqResumeOptional.get();
+        reqResume.setStatus(resume.getStatus());
+        return ResponseEntity.ok().body(this.resumeService.update(reqResume));
+    }
+
+    @DeleteMapping("/resumes/{id}")
+    @ApiMessage("Delete a resume by id")
+    public ResponseEntity<Void> delete(@PathVariable("id") long id) throws IdInvalidException {
+        Optional<Resume> reqResumeOptional = this.resumeService.fetchById(id);
+        if (reqResumeOptional.isEmpty()) {
+            throw new IdInvalidException("Resume với id = " + id + " không tồn tại");
+        }
+
+        this.resumeService.delete(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/resumes")
+    @ApiMessage("Fetch resumes by company with pagination")
+    public ResponseEntity<ResultPaginationDTO> getResumesByCompany(
+            @Filter Specification<Resume> spec,
+            Pageable pageable) {
+
+        // ✅ Lấy user hiện tại từ token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        User user = userService.handleGetUserByUsername(username);
+
+        long idRole = user.getRole().getId();
+        boolean isAdmin = roleService.permissionVsRole(idRole);
+
+        ResultPaginationDTO result;
+
+        if (isAdmin) {
+            // ✅ Admin xem tất cả resumes
+            result = this.resumeService.fetchAllResume(spec, pageable);
+        } else {
+            // ✅ User chỉ xem resume thuộc công ty của mình
+            if (user.getCompany() == null) {
+                // Không có công ty → danh sách rỗng
+                result = new ResultPaginationDTO();
+            } else {
+                long companyId = user.getCompany().getId();
+                result = this.resumeService.fetchResumesByCompanyId(companyId, pageable);
+            }
+        }
+
+        return ResponseEntity.ok(result);
+    }
 }
